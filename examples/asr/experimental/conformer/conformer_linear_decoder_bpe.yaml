@@ -1,9 +1,9 @@
 name: &name "Conformer-BPE"
 
 model:
+  load_weights_from_checkpoint: null
   sample_rate: &sample_rate 16000
   log_prediction: true
-  load_weights_from_checkpoint: null
   ctc_reduction: 'mean_batch'
 
   train_ds:
@@ -138,18 +138,19 @@ trainer:
   check_val_every_n_epoch: 1 # number of evaluations on validation every n epochs
   sync_batchnorm: true
   checkpoint_callback: false  # Provided by exp_manager
-  logger: false  # Provided by exp_manager
-
 
 exp_manager:
   exp_dir: null
   name: *name
   create_tensorboard_logger: true
   create_checkpoint_callback: true
+  checkpoint_callback_params:
+    monitor: "val_wer"
+    mode: "min"
+    save_top_k: 10
+  resume_if_exists: false
+  resume_ignore_no_checkpoint: false
   create_wandb_logger: false
   wandb_logger_kwargs:
     name: null
     project: null
-  resume_if_exists: false
-  resume_ignore_no_checkpoint: false
-
