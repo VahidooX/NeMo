@@ -145,7 +145,7 @@ exp_manager:
     # in case of multiple validation sets, first one is used
     monitor: "val_wer"
     mode: "min"
-    save_top_k: 3
+    save_top_k: 10
   resume_if_exists: false
   resume_ignore_no_checkpoint: false
 
