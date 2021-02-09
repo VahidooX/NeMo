@@ -52,7 +52,7 @@ HYDRA_FULL_ERROR=1 python average_model_checkpoints.py \
     --config-path="<path to config directory>" \
     --config-name="<config name>" \
     name=<name of the averaged checkpoint> \
-     +checkpoint_dir=<OPTIONAL: directory of checkpoint> \
+    +checkpoint_dir=<OPTIONAL: directory of checkpoint> \
     +checkpoint_paths=\"[/path/to/ptl_1.ckpt,/path/to/ptl_2.ckpt,/path/to/ptl_3.ckpt,...]\" \
     +save_ckpt_only=true
 
