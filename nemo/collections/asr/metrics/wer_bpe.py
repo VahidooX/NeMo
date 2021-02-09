@@ -77,7 +77,9 @@ class WERBPE(Metric):
         self.add_state("scores", default=torch.tensor(0), dist_reduce_fx='sum', persistent=False)
         self.add_state("words", default=torch.tensor(0), dist_reduce_fx='sum', persistent=False)
 
-    def ctc_decoder_predictions_tensor(self, predictions: torch.Tensor, predictions_len=None) -> List[str]:
+    def ctc_decoder_predictions_tensor(
+        self, predictions: torch.Tensor, predictions_len: torch.Tensor = None
+    ) -> List[str]:
         """
         Decodes a sequence of labels to words
         """
@@ -101,7 +103,11 @@ class WERBPE(Metric):
         return hypotheses
 
     def update(
-        self, predictions: torch.Tensor, targets: torch.Tensor, target_lengths: torch.Tensor, predictions_lengths=None
+        self,
+        predictions: torch.Tensor,
+        targets: torch.Tensor,
+        target_lengths: torch.Tensor,
+        predictions_lengths: torch.Tensor = None,
     ):
         words = 0.0
         scores = 0.0
