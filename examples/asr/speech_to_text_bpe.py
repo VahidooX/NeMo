@@ -73,7 +73,7 @@ def main(cfg):
     # initialize the model with the weights of the checkpoint specified by 'load_weights_from_checkpoint' in the configs
     # You may use this option to start the training from a pre-trained checkpoint
     checkpoint_path = cfg.model.get("load_weights_from_checkpoint", None)
-    if checkpoint_path:
+    if checkpoint_path and asr_model.global_step == 0:
         logging.info(f'Initializing the model with the checkpoint at "{checkpoint_path}"')
         asr_model.load_state_dict(torch.load(checkpoint_path, map_location=asr_model.device)["state_dict"])
 
