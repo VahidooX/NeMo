@@ -131,13 +131,13 @@ class ModelPT(LightningModule, Model):
             app_state.device_id = torch.cuda.current_device()
 
         if self._cfg is not None and not self._is_model_being_restored():
-            if 'train_ds' in self._cfg and self._cfg.train_ds is not None:
+            if 'train_ds' in self._cfg and self._cfg.train_ds is not None and self._cfg.train_ds.manifest_filepath:
                 self.setup_training_data(self._cfg.train_ds)
 
-            if 'validation_ds' in self._cfg and self._cfg.validation_ds is not None:
+            if 'validation_ds' in self._cfg and self._cfg.validation_ds is not None and self._cfg.train_ds.manifest_filepath:
                 self.setup_multiple_validation_data(val_data_config=None)
 
-            if 'test_ds' in self._cfg and self._cfg.test_ds is not None:
+            if 'test_ds' in self._cfg and self._cfg.test_ds is not None and self._cfg.train_ds.manifest_filepath:
                 self.setup_multiple_test_data(test_data_config=None)
 
         else:
