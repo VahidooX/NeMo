@@ -66,7 +66,7 @@ class LSTMDecoder(NeuralModule, Exportable):
             batch_first=True,
             bidirectional=bidirectional,
         )
-        self.linear_layer = torch.nn.Linear(in_features=lstm_hidden_size, out_features=self._num_classes)
+        self.linear_layer = torch.nn.Linear(in_features=lstm_hidden_size*2 if bidirectional else lstm_hidden_size, out_features=self._num_classes)
 
     @typecheck()
     def forward(self, encoder_output):
