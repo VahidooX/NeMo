@@ -32,7 +32,7 @@ like the Google text normalization data https://www.kaggle.com/richardwilliamspr
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument("--input", help="input file path", type=str)
+    parser.add_argument("--input", help="input file path. It can be a text file or a json manifest with a filed named 'text'.", type=str)
     parser.add_argument(
         "--normalizer",
         default='nemo',
@@ -52,6 +52,7 @@ if __name__ == "__main__":
     normalizer = normalizers[args.normalizer]
 
     print("Loading training data: " + file_path)
+
     training_data = load_files([file_path])
 
     if args.category is None:

@@ -14,6 +14,7 @@
 
 import sys
 from typing import List
+import re
 
 from tools.text_normalization.tag import Tag, TagType
 from tools.text_normalization.tagger import (
@@ -80,7 +81,7 @@ VERBALIZERS = {
 
 def find_tags(text: str) -> List[Tag]:
     """
-    Given text use all taggers to find all possible tags within the text 
+    Given text use all taggers to find all possible tags within the text
     Args:
         text: string
     Returns: List of tags
@@ -200,7 +201,29 @@ def normalize_nemo(un_normalized: List[str], verbose: bool = False) -> List[str]
     return res
 
 
-normalizers = {"identity": normalize_identity, "nemo": normalize_nemo}
+def normalize_nemo_asr(un_normalized: List[str], verbose: bool = False) -> List[str]:
+    """
+    Text normalization with NeMo algorithm. It make the text lower case after normalization.
+    Args:
+        un_normalized: List of unnormlized strings
+        verbose: if specified prints debugging info
+    Returns list of normalized strings
+    """
+    res = []
+    for input in tqdm(un_normalized):
+        text = normalize_numbers(input, verbose=verbose)
+
+        #TODO: add more cleaning stuff here.
+        text = text.lower()
+        text = re.sub('&', ' and ', text)
+        text = re.sub('[^a-z\']', ' ', text).strip()
+        text = " ".join(text.split())
+
+        res.append(text)
+    return res
+
+
+normalizers = {"identity": normalize_identity, "nemo": normalize_nemo, "nemo_asr": normalize_nemo_asr}
 
 
 if __name__ == "__main__":
