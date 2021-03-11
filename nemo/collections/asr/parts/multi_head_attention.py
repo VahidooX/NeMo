@@ -182,18 +182,18 @@ class RelPositionMultiHeadAttention(MultiHeadAttention):
     #
     #     return x
 
-    # def rel_shift2(self, x):
-    #     """Compute relative positional encoding.
-    #     Args:
-    #         x (torch.Tensor): (batch, nheads, time, 2*time-1)
-    #     """
-    #     #less efficient version which does flip
-    #     qlen = x.size(2)
-    #     pos_len = x.size(-1)
-    #     x = x.view(x.size(0), x.size(1), -1)
-    #     x = torch.nn.functional.pad(x, pad=(0, qlen))
-    #     x = x.view(x.size(0), x.size(1), qlen, pos_len + 1)
-    #     return x[:, :, :, 0:qlen].flip(dims=[-1])
+    def rel_shift2(self, x):
+        """Compute relative positional encoding.
+        Args:
+            x (torch.Tensor): (batch, nheads, time, 2*time-1)
+        """
+        #less efficient version which does flip
+        qlen = x.size(2)
+        pos_len = x.size(-1)
+        x = x.view(x.size(0), x.size(1), -1)
+        x = torch.nn.functional.pad(x, pad=(0, qlen))
+        x = x.view(x.size(0), x.size(1), qlen, pos_len + 1)
+        return x[:, :, :, 0:qlen].flip(dims=[-1])
 
     def rel_shift(self, x):
         """Compute relative positional encoding.
@@ -245,7 +245,7 @@ class RelPositionMultiHeadAttention(MultiHeadAttention):
 
         matrix_bd = self.rel_shift(matrix_bd)
         matrix_bd = matrix_bd[:, :, :, :matrix_ac.size(-1)]
-        #matrix_bd2 = self.rel_shift2(matrix_bd)
+        #matrix_bd = self.rel_shift2(matrix_bd)
 
         scores = (matrix_ac + matrix_bd) / math.sqrt(self.d_k)  # (batch, head, time1, time2)
 
@@ -262,7 +262,7 @@ class PositionalEncoding(torch.nn.Module):
         dropout_rate_emb (float): dropout rate for the positional embeddings
     """
 
-    def __init__(self, d_model, dropout_rate, max_len=1000, xscale=None, dropout_rate_emb=0.0):
+    def __init__(self, d_model, dropout_rate, max_len=5000, xscale=None, dropout_rate_emb=0.0):
         """Construct an PositionalEncoding object."""
         super(PositionalEncoding, self).__init__()
         self.d_model = d_model
@@ -292,7 +292,7 @@ class PositionalEncoding(torch.nn.Module):
         positions = torch.arange(0, length, dtype=torch.float32).unsqueeze(1)
         pe = self.create_pe(positions=positions)
         if not hasattr(self, 'pe'):
-            self.register_buffer('pe', pe)
+            self.register_buffer('pe', pe, persistent=False)
         self.pe = pe
 
     def forward(self, x: torch.Tensor):
@@ -327,7 +327,7 @@ class RelPositionalEncoding(PositionalEncoding):
         dropout_rate_emb (float): dropout rate for the positional embeddings
     """
 
-    def __init__(self, d_model, dropout_rate, max_len=1000, xscale=None, dropout_rate_emb=0.0):
+    def __init__(self, d_model, dropout_rate, max_len=5000, xscale=None, dropout_rate_emb=0.0):
         super().__init__(d_model, dropout_rate, max_len, xscale=xscale)
 
         if dropout_rate_emb > 0:
@@ -346,7 +346,7 @@ class RelPositionalEncoding(PositionalEncoding):
         #positions = torch.arange(length - 1, -length, -1, dtype=torch.float32).unsqueeze(1)
         pe = self.create_pe(positions=positions)
         if not hasattr(self, 'pe'):
-            self.register_buffer('pe', pe)
+            self.register_buffer('pe', pe, persistent=False)
         self.pe = pe
 
     def forward(self, x):
