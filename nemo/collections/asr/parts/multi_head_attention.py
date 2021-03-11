@@ -342,8 +342,8 @@ class RelPositionalEncoding(PositionalEncoding):
         needed_size = 2*(length - 1) + 1
         if hasattr(self, 'pe') and self.pe.size(1) >= needed_size:
             return
-        positions = torch.arange(-(length - 1), length, 1.0, dtype=torch.float32).unsqueeze(1)
-        #positions = torch.arange(length - 1, -length, -1, dtype=torch.float32).unsqueeze(1)
+        #positions = torch.arange(-(length - 1), length, 1.0, dtype=torch.float32).unsqueeze(1)
+        positions = torch.arange(length - 1, -length, -1, dtype=torch.float32).unsqueeze(1)
         pe = self.create_pe(positions=positions)
         if not hasattr(self, 'pe'):
             self.register_buffer('pe', pe, persistent=False)
