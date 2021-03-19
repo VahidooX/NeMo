@@ -18,7 +18,6 @@ import os
 import pickle as pkl
 from typing import Dict, List, Optional, Union
 
-import onnx
 import torch
 from omegaconf import DictConfig
 from omegaconf.omegaconf import open_dict
@@ -26,21 +25,20 @@ from pytorch_lightning import Trainer
 
 from nemo.collections.asr.data.audio_to_label import AudioToSpeechLabelDataset
 from nemo.collections.asr.losses.angularloss import AngularSoftmaxLoss
+from nemo.collections.asr.models.asr_model import ExportableEncDecModel
 from nemo.collections.asr.parts.features import WaveformFeaturizer
 from nemo.collections.asr.parts.perturb import process_augmentations
 from nemo.collections.common.losses import CrossEntropyLoss as CELoss
 from nemo.collections.common.metrics import TopKClassificationAccuracy
 from nemo.core.classes import ModelPT
 from nemo.core.classes.common import PretrainedModelInfo, typecheck
-from nemo.core.classes.exportable import Exportable
 from nemo.core.neural_types import *
 from nemo.utils import logging
-from nemo.utils.export_utils import attach_onnx_to_onnx
 
 __all__ = ['EncDecSpeakerLabelModel', 'ExtractSpeakerEmbeddingsModel']
 
 
-class EncDecSpeakerLabelModel(ModelPT, Exportable):
+class EncDecSpeakerLabelModel(ModelPT, ExportableEncDecModel):
     """Encoder decoder class for speaker label models.
     Model class creates training, validation methods for setting up data
     performing model forward pass.
@@ -59,16 +57,23 @@ class EncDecSpeakerLabelModel(ModelPT, Exportable):
         """
         result = []
         model = PretrainedModelInfo(
-            pretrained_model_name="SpeakerNet_recognition",
-            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemospeechmodels/versions/1.0.0a5/files/SpeakerNet_recognition.nemo",
-            description="SpeakerNet_recognition model trained end-to-end for speaker recognition purposes with cross_entropy loss. It was trained on voxceleb 1, voxceleb 2 dev datasets and augmented with musan music and noise. Speaker Recognition model achieves 2.65% EER on voxceleb-O cleaned trial file",
+            pretrained_model_name="speakerrecognition_speakernet",
+            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/speakerrecognition_speakernet/versions/1.0.0rc1/files/speakerrecognition_speakernet.nemo",
+            description="For details about this model, please visit https://ngc.nvidia.com/catalog/models/nvidia:nemo:speakerrecognition_speakernet",
         )
         result.append(model)
 
         model = PretrainedModelInfo(
-            pretrained_model_name="SpeakerNet_verification",
-            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemospeechmodels/versions/1.0.0a5/files/SpeakerNet_verification.nemo",
-            description="SpeakerNet_verification model trained end-to-end for speaker verification purposes with arcface angular softmax loss. It was trained on voxceleb 1, voxceleb 2 dev datasets and augmented with musan music and noise. Speaker Verification model achieves 2.12% EER on voxceleb-O cleaned trial file",
+            pretrained_model_name="speakerverification_speakernet",
+            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/speakerverification_speakernet/versions/1.0.0rc1/files/speakerverification_speakernet.nemo",
+            description="For details about this model, please visit https://ngc.nvidia.com/catalog/models/nvidia:nemo:speakerverification_speakernet",
+        )
+        result.append(model)
+
+        model = PretrainedModelInfo(
+            pretrained_model_name="speakerdiarization_speakernet",
+            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/speakerdiarization_speakernet/versions/1.0.0rc1/files/speakerdiarization_speakernet.nemo",
+            description="For details about this model, please visit https://ngc.nvidia.com/catalog/models/nvidia:nemo:speakerdiarization_speakernet",
         )
         result.append(model)
 
@@ -329,68 +334,6 @@ class EncDecSpeakerLabelModel(ModelPT, Exportable):
             self._cfg.decoder = new_decoder_config
 
         logging.info(f"Changed decoder output to # {self.decoder._num_classes} classes.")
-
-    def export(
-        self,
-        output: str,
-        input_example=None,
-        output_example=None,
-        verbose=False,
-        export_params=True,
-        do_constant_folding=True,
-        keep_initializers_as_inputs=False,
-        onnx_opset_version: int = 12,
-        try_script: bool = False,
-        set_eval: bool = True,
-        check_trace: bool = True,
-        use_dynamic_axes: bool = True,
-    ):
-        if input_example is not None or output_example is not None:
-            logging.warning(
-                "Passed input and output examples will be ignored and recomputed since"
-                " EncDecSpeakerModel consists of two separate models (encoder and decoder) with different"
-                " inputs and outputs."
-            )
-
-        qual_name = self.__module__ + '.' + self.__class__.__qualname__
-        output1 = os.path.join(os.path.dirname(output), 'encoder_' + os.path.basename(output))
-        output1_descr = qual_name + ' Encoder exported to ONNX'
-        encoder_onnx = self.encoder.export(
-            output1,
-            None,  # computed by input_example()
-            None,
-            verbose,
-            export_params,
-            do_constant_folding,
-            keep_initializers_as_inputs,
-            onnx_opset_version,
-            try_script,
-            set_eval,
-            check_trace,
-            use_dynamic_axes,
-        )
-
-        output2 = os.path.join(os.path.dirname(output), 'decoder_' + os.path.basename(output))
-        output2_descr = qual_name + ' Decoder exported to ONNX'
-        decoder_onnx = self.decoder.export(
-            output2,
-            None,  # computed by input_example()
-            None,
-            verbose,
-            export_params,
-            do_constant_folding,
-            keep_initializers_as_inputs,
-            onnx_opset_version,
-            try_script,
-            set_eval,
-            check_trace,
-            use_dynamic_axes,
-        )
-
-        output_model = attach_onnx_to_onnx(encoder_onnx, decoder_onnx, "SL")
-        output_descr = qual_name + ' Encoder+Decoder exported to ONNX'
-        onnx.save(output_model, output)
-        return ([output, output1, output2], [output_descr, output1_descr, output2_descr])
 
 
 class ExtractSpeakerEmbeddingsModel(EncDecSpeakerLabelModel):

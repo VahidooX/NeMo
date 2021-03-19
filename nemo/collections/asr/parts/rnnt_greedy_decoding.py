@@ -26,6 +26,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
 from typing import List, Optional, Union
 
 import torch
@@ -76,7 +77,7 @@ class _GreedyRNNTInfer(Typing):
     def output_types(self):
         """Returns definitions of module output ports.
         """
-        return {"predictions": NeuralType(elements_type=HypothesisType())}
+        return {"predictions": [NeuralType(elements_type=HypothesisType())]}
 
     def __init__(
         self,
@@ -574,3 +575,13 @@ class GreedyBatchedRNNTInfer(_GreedyRNNTInfer):
                 symbols_added += 1
 
         return label, timesteps
+
+
+@dataclass
+class GreedyRNNTInferConfig:
+    max_symbols_per_step: Optional[int] = None
+
+
+@dataclass
+class GreedyBatchedRNNTInferConfig:
+    max_symbols_per_step: Optional[int] = None

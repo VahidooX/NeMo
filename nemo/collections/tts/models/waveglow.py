@@ -90,8 +90,8 @@ class WaveGlowModel(GlowVocoder, Exportable):
         if self.mode == OperationMode.training or self.mode == OperationMode.validation:
             output_dict = {
                 "pred_normal_dist": NeuralType(('B', 'flowgroup', 'T'), NormalDistributionSamplesType()),
-                "log_s_list": NeuralType(('B', 'flowgroup', 'T'), VoidType()),  # TODO: Figure out a good typing
-                "log_det_W_list": NeuralType(elements_type=LogDeterminantType()),
+                "log_s_list": [NeuralType(('B', 'flowgroup', 'T'), VoidType())],  # TODO: Figure out a good typing
+                "log_det_W_list": [NeuralType(elements_type=LogDeterminantType())],
             }
             if self.mode == OperationMode.validation:
                 output_dict["audio_pred"] = NeuralType(('B', 'T'), AudioSignal())
@@ -135,7 +135,7 @@ class WaveGlowModel(GlowVocoder, Exportable):
                 spec=spec.to(self.waveglow.upsample.weight.dtype), run_inverse=True, audio=None, sigma=sigma
             )
             if denoise:
-                audio = self.denoise(audio, denoiser_strength)
+                audio = self.denoise(audio=audio, strength=denoiser_strength)
 
         return audio
 
@@ -220,43 +220,32 @@ class WaveGlowModel(GlowVocoder, Exportable):
         """
         list_of_models = []
         model = PretrainedModelInfo(
-            pretrained_model_name="WaveGlow-22050Hz",
-            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemottsmodels/versions/1.0.0a5/files/WaveGlow-22050Hz.nemo",
-            description="This model is trained on LJSpeech sampled at 22050Hz, and can be used as an universal vocoder.",
+            pretrained_model_name="tts_waveglow_268m",
+            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/tts_waveglow_268m/versions/1.0.0rc1/files/tts_waveglow_268m.nemo",
+            description="This model is trained on LJSpeech sampled at 22050Hz, and has been tested on generating female English voices with an American accent and Mandarin voices.",
+            class_=cls,
+        )
+        list_of_models.append(model)
+        model = PretrainedModelInfo(
+            pretrained_model_name="tts_waveglow_88m",
+            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/tts_waveglow_88m/versions/1.0.0rc1/files/tts_waveglow_88m.nemo",
+            description="This model is trained on LJSpeech sampled at 22050Hz, and has been tested on generating female English voices with an American accent and Mandarin voices.",
             class_=cls,
         )
         list_of_models.append(model)
         return list_of_models
 
-    def export(
-        self,
-        output: str,
-        input_example=None,
-        output_example=None,
-        verbose=False,
-        export_params=True,
-        do_constant_folding=True,
-        keep_initializers_as_inputs=False,
-        onnx_opset_version: int = 12,
-        try_script: bool = False,
-        set_eval: bool = True,
-        check_trace: bool = True,
-        use_dynamic_axes: bool = True,
-        check_tolerance=0.01,
-    ):
+    @property
+    def input_module(self):
+        return self.waveglow
+
+    @property
+    def output_module(self):
+        return self.waveglow
+
+    def _prepare_for_export(self):
         self.update_bias_spect()
-        self.waveglow.export(
-            output,
-            input_example=input_example,
-            output_example=output_example,
-            verbose=verbose,
-            export_params=export_params,
-            do_constant_folding=do_constant_folding,
-            keep_initializers_as_inputs=keep_initializers_as_inputs,
-            onnx_opset_version=onnx_opset_version,
-            try_script=try_script,
-            set_eval=try_script,
-            check_trace=check_trace,
-            use_dynamic_axes=use_dynamic_axes,
-            check_tolerance=check_tolerance,
-        )
+        self.waveglow._prepare_for_export()
+
+    def forward_for_export(self, spec, z=None):
+        return self.waveglow(spec, z)

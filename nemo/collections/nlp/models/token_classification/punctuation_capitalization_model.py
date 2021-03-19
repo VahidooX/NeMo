@@ -31,10 +31,9 @@ from nemo.collections.nlp.modules.common import TokenClassifier
 from nemo.collections.nlp.modules.common.lm_utils import get_lm_model
 from nemo.collections.nlp.parts.utils_funcs import tensor2list
 from nemo.core.classes.common import PretrainedModelInfo, typecheck
-from nemo.core.classes.exportable import Exportable
+from nemo.core.classes.exportable import Exportable, ExportFormat
 from nemo.core.neural_types import LogitsType, NeuralType
 from nemo.utils import logging
-from nemo.utils.export_utils import attach_onnx_to_onnx
 
 __all__ = ['PunctuationCapitalizationModel']
 
@@ -64,6 +63,7 @@ class PunctuationCapitalizationModel(NLPModel, Exportable):
             config_file=cfg.language_model.config_file,
             config_dict=OmegaConf.to_container(cfg.language_model.config) if cfg.language_model.config else None,
             checkpoint_file=cfg.language_model.lm_checkpoint,
+            vocab_file=cfg.tokenizer.vocab_file,
         )
 
         self.punct_classifier = TokenClassifier(
@@ -336,20 +336,24 @@ class PunctuationCapitalizationModel(NLPModel, Exportable):
             drop_last=self._cfg.dataset.drop_last,
         )
 
-    def _setup_infer_dataloader(self, queries: List[str], batch_size: int) -> 'torch.utils.data.DataLoader':
+    def _setup_infer_dataloader(
+        self, queries: List[str], batch_size: int, max_seq_length: int = None
+    ) -> 'torch.utils.data.DataLoader':
         """
         Setup function for a infer data loader.
 
         Args:
             queries: lower cased text without punctuation
             batch_size: batch size to use during inference
-
+            max_seq_length: maximum sequence length after tokenization
         Returns:
             A pytorch DataLoader.
         """
+        if max_seq_length is None:
+            max_seq_length = self._cfg.dataset.max_seq_length
 
         dataset = BertPunctuationCapitalizationInferDataset(
-            tokenizer=self.tokenizer, queries=queries, max_seq_length=self._cfg.dataset.max_seq_length
+            tokenizer=self.tokenizer, queries=queries, max_seq_length=max_seq_length
         )
 
         return torch.utils.data.DataLoader(
@@ -362,12 +366,15 @@ class PunctuationCapitalizationModel(NLPModel, Exportable):
             drop_last=False,
         )
 
-    def add_punctuation_capitalization(self, queries: List[str], batch_size: int = None) -> List[str]:
+    def add_punctuation_capitalization(
+        self, queries: List[str], batch_size: int = None, max_seq_length: int = 512
+    ) -> List[str]:
         """
         Adds punctuation and capitalization to the queries. Use this method for debugging and prototyping.
         Args:
             queries: lower cased text without punctuation
             batch_size: batch size to use during inference
+            max_seq_length: maximum sequence length after tokenization
         Returns:
             result: text with added capitalization and punctuation
         """
@@ -387,7 +394,8 @@ class PunctuationCapitalizationModel(NLPModel, Exportable):
             # Switch model to evaluation mode
             self.eval()
             self = self.to(device)
-            infer_datalayer = self._setup_infer_dataloader(queries, batch_size)
+
+            infer_datalayer = self._setup_infer_dataloader(queries, batch_size, max_seq_length)
 
             # store predictions for all queries in a single list
             all_punct_preds = []
@@ -403,29 +411,33 @@ class PunctuationCapitalizationModel(NLPModel, Exportable):
                 )
 
                 subtokens_mask = subtokens_mask > 0.5
-                punct_preds = tensor2list(torch.argmax(punct_logits, axis=-1)[subtokens_mask])
-                capit_preds = tensor2list(torch.argmax(capit_logits, axis=-1)[subtokens_mask])
+
+                punct_preds = [
+                    tensor2list(p_l[subtokens_mask[i]]) for i, p_l in enumerate(torch.argmax(punct_logits, axis=-1))
+                ]
+                capit_preds = [
+                    tensor2list(c_l[subtokens_mask[i]]) for i, c_l in enumerate(torch.argmax(capit_logits, axis=-1))
+                ]
+
                 all_punct_preds.extend(punct_preds)
                 all_capit_preds.extend(capit_preds)
-
-            queries = [q.strip().split() for q in queries]
-            queries_len = [len(q) for q in queries]
-
-            if sum(queries_len) != len(all_punct_preds) or sum(queries_len) != len(all_capit_preds):
-                raise ValueError('Pred and words must have the same length')
 
             punct_ids_to_labels = {v: k for k, v in self._cfg.punct_label_ids.items()}
             capit_ids_to_labels = {v: k for k, v in self._cfg.capit_label_ids.items()}
 
-            start_idx = 0
-            end_idx = 0
-            for query in queries:
-                end_idx += len(query)
+            queries = [q.strip().split() for q in queries]
+            for i, query in enumerate(queries):
+                punct_preds = all_punct_preds[i]
+                capit_preds = all_capit_preds[i]
+                if len(query) != len(punct_preds):
+                    logging.warning(
+                        f'Max sequence length of query {query} is set to {max_seq_length}. Truncating the input.'
+                    )
 
-                # extract predictions for the current query from the list of all predictions
-                punct_preds = all_punct_preds[start_idx:end_idx]
-                capit_preds = all_capit_preds[start_idx:end_idx]
-                start_idx = end_idx
+                    # removing the end of phrase punctuation of the truncated segment
+                    punct_preds[-1] = 0
+                    max_len = len(punct_preds)
+                    query = query[:max_len]
 
                 query_with_punct_and_capit = ''
                 for j, word in enumerate(query):
@@ -456,114 +468,29 @@ class PunctuationCapitalizationModel(NLPModel, Exportable):
         result = []
         result.append(
             PretrainedModelInfo(
-                pretrained_model_name="Punctuation_Capitalization_with_BERT",
-                location="https://api.ngc.nvidia.com/v2/models/nvidia/nemonlpmodels/versions/1.0.0a5/files/Punctuation_Capitalization_with_BERT.nemo",
+                pretrained_model_name="punctuation_en_bert",
+                location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/punctuation_en_bert/versions/1.0.0rc1/files/punctuation_en_bert.nemo",
                 description="The model was trained with NeMo BERT base uncased checkpoint on a subset of data from the following sources: Tatoeba sentences, books from Project Gutenberg, Fisher transcripts.",
             )
         )
         result.append(
             PretrainedModelInfo(
-                pretrained_model_name="Punctuation_Capitalization_with_DistilBERT",
-                location="https://api.ngc.nvidia.com/v2/models/nvidia/nemonlpmodels/versions/1.0.0a5/files/Punctuation_Capitalization_with_DistilBERT.nemo",
+                pretrained_model_name="punctuation_en_distilbert",
+                location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/punctuation_en_distilbert/versions/1.0.0rc1/files/punctuation_en_distilbert.nemo",
                 description="The model was trained with DiltilBERT base uncased checkpoint from HuggingFace on a subset of data from the following sources: Tatoeba sentences, books from Project Gutenberg, Fisher transcripts.",
             )
         )
         return result
 
+    @property
+    def input_module(self):
+        return self.bert_model
+
+    @property
+    def output_module(self):
+        return self
+
     def _prepare_for_export(self):
-        return self.bert_model._prepare_for_export()
-
-    def export(
-        self,
-        output: str,
-        input_example=None,
-        output_example=None,
-        verbose=False,
-        export_params=True,
-        do_constant_folding=True,
-        keep_initializers_as_inputs=False,
-        onnx_opset_version: int = 12,
-        try_script: bool = False,
-        set_eval: bool = True,
-        check_trace: bool = True,
-        use_dynamic_axes: bool = True,
-    ):
-        """
-        Unlike other models' export() this one creates 5 output files, not 3:
-        punct_<output> - fused punctuation model (BERT+PunctuationClassifier)
-        capit_<output> - fused capitalization model (BERT+CapitalizationClassifier)
-        bert_<output> - common BERT neural net
-        punct_classifier_<output> - Punctuation Classifier neural net
-        capt_classifier_<output> - Capitalization Classifier neural net
-        """
-        if input_example is not None or output_example is not None:
-            logging.warning(
-                "Passed input and output examples will be ignored and recomputed since"
-                " PunctuationCapitalizationModel consists of three separate models with different"
-                " inputs and outputs."
-            )
-
-        qual_name = self.__module__ + '.' + self.__class__.__qualname__
-        output1 = os.path.join(os.path.dirname(output), 'bert_' + os.path.basename(output))
-        output1_descr = qual_name + ' BERT exported to ONNX'
-        bert_model_onnx = self.bert_model.export(
-            output1,
-            None,  # computed by input_example()
-            None,
-            verbose,
-            export_params,
-            do_constant_folding,
-            keep_initializers_as_inputs,
-            onnx_opset_version,
-            try_script,
-            set_eval,
-            check_trace,
-            use_dynamic_axes,
-        )
-
-        output2 = os.path.join(os.path.dirname(output), 'punct_classifier_' + os.path.basename(output))
-        output2_descr = qual_name + ' Punctuation Classifier exported to ONNX'
-        punct_classifier_onnx = self.punct_classifier.export(
-            output2,
-            None,  # computed by input_example()
-            None,
-            verbose,
-            export_params,
-            do_constant_folding,
-            keep_initializers_as_inputs,
-            onnx_opset_version,
-            try_script,
-            set_eval,
-            check_trace,
-            use_dynamic_axes,
-        )
-
-        output3 = os.path.join(os.path.dirname(output), 'capit_classifier_' + os.path.basename(output))
-        output3_descr = qual_name + ' Capitalization Classifier exported to ONNX'
-        capit_classifier_onnx = self.capit_classifier.export(
-            output3,
-            None,  # computed by input_example()
-            None,
-            verbose,
-            export_params,
-            do_constant_folding,
-            keep_initializers_as_inputs,
-            onnx_opset_version,
-            try_script,
-            set_eval,
-            check_trace,
-            use_dynamic_axes,
-        )
-
-        punct_output_model = attach_onnx_to_onnx(bert_model_onnx, punct_classifier_onnx, "PTCL")
-        output4 = os.path.join(os.path.dirname(output), 'punct_' + os.path.basename(output))
-        output4_descr = qual_name + ' Punctuation BERT+Classifier exported to ONNX'
-        onnx.save(punct_output_model, output4)
-        capit_output_model = attach_onnx_to_onnx(bert_model_onnx, capit_classifier_onnx, "CPCL")
-        output5 = os.path.join(os.path.dirname(output), 'capit_' + os.path.basename(output))
-        output5_descr = qual_name + ' Capitalization BERT+Classifier exported to ONNX'
-        onnx.save(capit_output_model, output5)
-        return (
-            [output1, output2, output3, output4, output5],
-            [output1_descr, output2_descr, output3_descr, output4_descr, output5_descr],
-        )
+        self.bert_model._prepare_for_export()
+        self.punct_classifier._prepare_for_export()
+        self.capit_classifier._prepare_for_export()

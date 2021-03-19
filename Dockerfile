@@ -67,6 +67,8 @@ RUN COMMIT_SHA=f546575109111c455354861a0567c8aa794208a2 && \
     python3 setup.py install && \
     rm -rf ../tests test ../tensorflow_binding
 
+# uninstall stuff from base container
+RUN pip uninstall -y sacrebleu
 
 # install nemo dependencies
 WORKDIR /tmp/nemo
@@ -87,7 +89,7 @@ COPY . .
 
 # start building the final container
 FROM nemo-deps as nemo
-ARG NEMO_VERSION=1.0.0b2
+ARG NEMO_VERSION=1.0.0rc1
 
 # Check that NEMO_VERSION is set. Build will fail without this. Expose NEMO and base container
 # version information as runtime environment variable for introspection purposes

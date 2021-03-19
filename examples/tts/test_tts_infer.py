@@ -21,6 +21,7 @@ from math import ceil
 from pathlib import Path
 
 import librosa
+import soundfile
 import torch
 
 from nemo.collections.asr.metrics.wer import word_error_rate
@@ -56,13 +57,13 @@ def main():
     parser.add_argument(
         "--tts_model_spec",
         type=str,
-        default="Tacotron2-22050Hz",
+        default="tts_en_tacotron2",
         choices=[x.pretrained_model_name for x in SpectrogramGenerator.list_available_models()],
     )
     parser.add_argument(
         "--tts_model_vocoder",
         type=str,
-        default="WaveGlow-22050Hz",
+        default="tts_waveglow_88m",
         choices=[x.pretrained_model_name for x in Vocoder.list_available_models()],
     )
     parser.add_argument("--wer_tolerance", type=float, default=1.0, help="used by test")
@@ -133,7 +134,7 @@ def main():
         aud = aud.cpu().numpy()
         if args.trim:
             aud = librosa.effects.trim(aud, top_db=40)[0]
-        librosa.output.write_wav(f"{i}.wav", aud, sr=22050)
+        soundfile.write(f"{i}.wav", aud, samplerate=22050)
         audio_file_paths.append(str(Path(f"{i}.wav")))
 
     # Do ASR

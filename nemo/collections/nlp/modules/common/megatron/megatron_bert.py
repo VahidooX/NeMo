@@ -28,12 +28,17 @@ from nemo.collections.nlp.modules.common.bert_module import BertModule
 from nemo.core.classes import typecheck
 from nemo.utils import logging
 from nemo.utils.app_state import AppState
-from nemo.utils.decorators import experimental
 
 __all__ = ['MegatronBertEncoder']
 
 
-@experimental
+def complete_lazy_init(self):
+    # finish megatron-lm initialization
+    if hasattr(self, "_lazy_init_fn") and self._lazy_init_fn is not None:
+        self._lazy_init_fn()
+        self._lazy_init_fn = None
+
+
 class MegatronBertEncoder(BertModule):
     """
     MegatronBERT wraps around the Megatron Language model
@@ -85,8 +90,8 @@ class MegatronBertEncoder(BertModule):
         # We set 'lazy_mpu_init' flag on to make Megatron do only the initialization that does not depend
         # on ddp be initialized yet (and we don't want Megatron to initialize DDP itself either)
         # and to return a hook for us to call after PTL has torch.distributed initialized.
-        # We call this hook during .forward
-        # TODO: can we call this hook using the PTL hook .setup()
+        # (or if no PTL in case of inference - then we'll initialize torch.distributed)
+        # We call and clear this hook on first call to forward()
         self._lazy_init_fn = initialize_megatron(
             extra_args_provider=extra_args_provider, args_defaults=config, ignore_unknown_args=True
         )
@@ -103,6 +108,12 @@ class MegatronBertEncoder(BertModule):
         # key used for checkpoints
         self._hidden_size = self.language_model.hidden_size
 
+    def complete_lazy_init(self):
+        # finish megatron-lm initialization
+        if hasattr(self, "_lazy_init_fn") and self._lazy_init_fn is not None:
+            self._lazy_init_fn()
+            self._lazy_init_fn = None
+
     @property
     def hidden_size(self):
         """
@@ -115,6 +126,8 @@ class MegatronBertEncoder(BertModule):
 
     @typecheck()
     def forward(self, input_ids, attention_mask, token_type_ids):
+        self.complete_lazy_init()
+
         extended_attention_mask = bert_extended_attention_mask(attention_mask)
         position_ids = bert_position_ids(input_ids)
 
@@ -155,6 +168,7 @@ class MegatronBertEncoder(BertModule):
             restore_path (str): restore_path should a file or a directory if using model parallel
         """
         self._restore_path = restore_path
+
         if os.path.isfile(restore_path):
             self._load_checkpoint(restore_path)
         elif os.path.isdir(restore_path):

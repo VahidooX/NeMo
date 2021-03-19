@@ -62,7 +62,7 @@ class TestPretrainedModelPerformance(TestCase):
     )
     def test_punct_capit_with_bert(self):
         data_dir = '/home/TestData/nlp/token_classification_punctuation/fisher'
-        model = models.PunctuationCapitalizationModel.from_pretrained("Punctuation_Capitalization_with_BERT")
+        model = models.PunctuationCapitalizationModel.from_pretrained("punctuation_en_bert")
         metrics = get_metrics(data_dir, model)
 
         assert abs(metrics['punct_precision'] - 52.3024) < 0.001
@@ -73,6 +73,11 @@ class TestPretrainedModelPerformance(TestCase):
         assert abs(metrics['capit_f1'] - 87.0707) < 0.001
         assert int(model.punct_class_report.total_examples) == 128
 
+        preds_512 = model.add_punctuation_capitalization(['what can i do for you today'], max_seq_length=512)[0]
+        assert preds_512 == 'What can I do for you today?'
+        preds_5 = model.add_punctuation_capitalization(['what can i do for you today'], max_seq_length=5)[0]
+        assert preds_5 == 'What can i'
+
     @pytest.mark.unit
     @pytest.mark.run_only_on('GPU')
     @pytest.mark.skipif(
@@ -80,7 +85,7 @@ class TestPretrainedModelPerformance(TestCase):
     )
     def test_punct_capit_with_distilbert(self):
         data_dir = '/home/TestData/nlp/token_classification_punctuation/fisher'
-        model = models.PunctuationCapitalizationModel.from_pretrained("Punctuation_Capitalization_with_DistilBERT")
+        model = models.PunctuationCapitalizationModel.from_pretrained("punctuation_en_distilbert")
         metrics = get_metrics(data_dir, model)
 
         assert abs(metrics['punct_precision'] - 53.0826) < 0.001
@@ -95,7 +100,7 @@ class TestPretrainedModelPerformance(TestCase):
     )
     def test_ner_model(self):
         data_dir = '/home/TestData/nlp/token_classification_punctuation/gmb'
-        model = models.TokenClassificationModel.from_pretrained("NERModel")
+        model = models.TokenClassificationModel.from_pretrained("ner_en_bert")
         metrics = get_metrics(data_dir, model)
 
         assert abs(metrics['precision'] - 96.0937) < 0.001

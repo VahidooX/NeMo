@@ -101,7 +101,7 @@ class MultiHeadAttention(nn.Module):
         """
         n_batch = value.size(0)
         if mask is not None:
-            mask = mask.unsqueeze(1)  # .eq(0)  # (batch, 1, time1, time2)
+            mask = mask.unsqueeze(1)  # (batch, 1, time1, time2)
             if scores.dtype == torch.float16:
                 dtype = np.float16
             else:
@@ -339,10 +339,11 @@ class RelPositionalEncoding(PositionalEncoding):
 
     def extend_pe(self, length):
         """Reset and extend the positional encodings if needed."""
-        needed_size = 2*(length - 1) + 1
+        needed_size = 2 * (length - 1) + 1
         if hasattr(self, 'pe') and self.pe.size(1) >= needed_size:
             return
-        #positions = torch.arange(-(length - 1), length, 1.0, dtype=torch.float32).unsqueeze(1)
+        # positions would be from negative numbers to positive
+        # positive positions would be used for left positions and negative for right positions
         positions = torch.arange(length - 1, -length, -1, dtype=torch.float32).unsqueeze(1)
         pe = self.create_pe(positions=positions)
         if not hasattr(self, 'pe'):
@@ -364,10 +365,13 @@ class RelPositionalEncoding(PositionalEncoding):
         if self.xscale:
             x = x * self.xscale
 
+        # center_pos would be the index of position 0
+        # negative positions would be used for right and positive for left tokens
+        # for input of length L, 2*L-1 positions are needed, positions from (L-1) to -(L-1)
         center_pos = self.pe.size(1) // 2
         start_pos = center_pos - x.size(1) + 1
         end_pos = center_pos + x.size(1)
-        pos_emb = self.pe[:, start_pos: end_pos]
+        pos_emb = self.pe[:, start_pos:end_pos]
         if self.dropout_emb:
             pos_emb = self.dropout_emb(pos_emb)
         return self.dropout(x), pos_emb

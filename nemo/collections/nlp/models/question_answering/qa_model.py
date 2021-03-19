@@ -13,10 +13,8 @@
 # limitations under the License.
 
 import json
-import os
 from typing import Dict, Optional
 
-import onnx
 import torch
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning import Trainer
@@ -34,15 +32,13 @@ from nemo.collections.nlp.modules.common import TokenClassifier
 from nemo.collections.nlp.modules.common.lm_utils import get_lm_model
 from nemo.collections.nlp.parts.utils_funcs import tensor2list
 from nemo.core.classes.common import PretrainedModelInfo, typecheck
-from nemo.core.classes.exportable import Exportable
 from nemo.core.neural_types import NeuralType
 from nemo.utils import logging
-from nemo.utils.export_utils import attach_onnx_to_onnx
 
 __all__ = ['QAModel']
 
 
-class QAModel(NLPModel, Exportable):
+class QAModel(NLPModel):
     """
     BERT encoder with QA head training.
     """
@@ -63,6 +59,7 @@ class QAModel(NLPModel, Exportable):
             config_file=cfg.language_model.config_file,
             config_dict=OmegaConf.to_container(cfg.language_model.config) if cfg.language_model.config else None,
             checkpoint_file=cfg.language_model.lm_checkpoint,
+            vocab_file=cfg.tokenizer.vocab_file,
         )
 
         self.classifier = TokenClassifier(
@@ -193,15 +190,16 @@ class QAModel(NLPModel, Exportable):
     ):
         """
         Get prediction for unlabeled inference data
+
         Args:
             file: inference data
             batch_size: batch size to use during inference
             num_samples: number of samples to use of inference data. Default: -1 if all data should be used.
             output_nbest_file: optional output file for writing out nbest list
             output_prediction_file: optional output file for writing out predictions
+            
         Returns:
-            all_predictions: model predictions
-            all_nbest: model nbest list
+            model predictions, model nbest list
         """
         # store predictions for all queries in a single list
         all_predictions = []
@@ -338,93 +336,68 @@ class QAModel(NLPModel, Exportable):
             List of available pre-trained models.
         """
         result = []
-        model = PretrainedModelInfo(
-            pretrained_model_name="BERTBaseUncasedSQuADv1.1",
-            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemonlpmodels/versions/1.0.0a5/files/BERTBaseUncasedSQuADv1.1.nemo",
-            description="Question answering model finetuned from NeMo BERT Base Uncased on SQuAD v1.1 dataset which obtains an exact match (EM) score of 82.43% and an F1 score of 89.59%.",
-        )
-        result.append(model)
-        model = PretrainedModelInfo(
-            pretrained_model_name="BERTBaseUncasedSQuADv2.0",
-            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemonlpmodels/versions/1.0.0a5/files/BERTBaseUncasedSQuADv2.0.nemo",
-            description="Question answering model finetuned from NeMo BERT Base Uncased on SQuAD v2.0 dataset which obtains an exact match (EM) score of 73.35% and an F1 score of 76.44%.",
-        )
-        result.append(model)
-        model = PretrainedModelInfo(
-            pretrained_model_name="BERTLargeUncasedSQuADv1.1",
-            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemonlpmodels/versions/1.0.0a5/files/BERTLargeUncasedSQuADv1.1.nemo",
-            description="Question answering model finetuned from NeMo BERT Large Uncased on SQuAD v1.1 dataset which obtains an exact match (EM) score of 85.47% and an F1 score of 92.10%.",
-        )
-        result.append(model)
-        model = PretrainedModelInfo(
-            pretrained_model_name="BERTLargeUncasedSQuADv2.0",
-            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemonlpmodels/versions/1.0.0a5/files/BERTLargeUncasedSQuADv2.0.nemo",
-            description="Question answering model finetuned from NeMo BERT Large Uncased on SQuAD v2.0 dataset which obtains an exact match (EM) score of 78.8% and an F1 score of 81.85%.",
-        )
-        result.append(model)
-        return result
 
-    def _prepare_for_export(self):
-        return self.bert_model._prepare_for_export()
-
-    def export(
-        self,
-        output: str,
-        input_example=None,
-        output_example=None,
-        verbose=False,
-        export_params=True,
-        do_constant_folding=True,
-        keep_initializers_as_inputs=False,
-        onnx_opset_version: int = 12,
-        try_script: bool = False,
-        set_eval: bool = True,
-        check_trace: bool = True,
-        use_dynamic_axes: bool = True,
-    ):
-        if input_example is not None or output_example is not None:
-            logging.warning(
-                "Passed input and output examples will be ignored and recomputed since"
-                " QAModel consists of two separate models with different"
-                " inputs and outputs."
+        result.append(
+            PretrainedModelInfo(
+                pretrained_model_name="qa_squadv1_1_bertbase",
+                location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/qa_squadv1_1_bertbase/versions/1.0.0rc1/files/qa_squadv1.1_bertbase.nemo",
+                description="Question answering model finetuned from NeMo BERT Base Uncased on SQuAD v1.1 dataset which obtains an exact match (EM) score of 82.78% and an F1 score of 82.78%.",
             )
-
-        qual_name = self.__module__ + '.' + self.__class__.__qualname__
-        output1 = os.path.join(os.path.dirname(output), 'bert_' + os.path.basename(output))
-        output1_descr = qual_name + ' BERT exported to ONNX'
-        bert_model_onnx = self.bert_model.export(
-            output1,
-            None,  # computed by input_example()
-            None,
-            verbose,
-            export_params,
-            do_constant_folding,
-            keep_initializers_as_inputs,
-            onnx_opset_version,
-            try_script,
-            set_eval,
-            check_trace,
-            use_dynamic_axes,
         )
 
-        output2 = os.path.join(os.path.dirname(output), 'classifier_' + os.path.basename(output))
-        output2_descr = qual_name + ' Classifier exported to ONNX'
-        classifier_onnx = self.classifier.export(
-            output2,
-            None,  # computed by input_example()
-            None,
-            verbose,
-            export_params,
-            do_constant_folding,
-            keep_initializers_as_inputs,
-            onnx_opset_version,
-            try_script,
-            set_eval,
-            check_trace,
-            use_dynamic_axes,
+        result.append(
+            PretrainedModelInfo(
+                pretrained_model_name="qa_squadv2_0_bertbase",
+                location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/qa_squadv2_0_bertbase/versions/1.0.0rc1/files/qa_squadv2.0_bertbase.nemo",
+                description="Question answering model finetuned from NeMo BERT Base Uncased on SQuAD v2.0 dataset which obtains an exact match (EM) score of 75.04% and an F1 score of 78.08%.",
+            )
         )
 
-        output_model = attach_onnx_to_onnx(bert_model_onnx, classifier_onnx, "QA")
-        output_descr = qual_name + ' BERT+Classifier exported to ONNX'
-        onnx.save(output_model, output)
-        return ([output, output1, output2], [output_descr, output1_descr, output2_descr])
+        result.append(
+            PretrainedModelInfo(
+                pretrained_model_name="qa_squadv1_1_bertlarge",
+                location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/qa_squadv2_0_bertbase/versions/1.0.0rc1/files/qa_squadv2.0_bertbase.nemo",
+                description="Question answering model finetuned from NeMo BERT Large Uncased on SQuAD v1.1 dataset which obtains an exact match (EM) score of 85.44% and an F1 score of 92.06%.",
+            )
+        )
+
+        result.append(
+            PretrainedModelInfo(
+                pretrained_model_name="qa_squadv2_0_bertlarge",
+                location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/qa_squadv2_0_bertbase/versions/1.0.0rc1/files/qa_squadv2.0_bertbase.nemo",
+                description="Question answering model finetuned from NeMo BERT Large Uncased on SQuAD v2.0 dataset which obtains an exact match (EM) score of 80.22% and an F1 score of 83.05%.",
+            )
+        )
+
+        result.append(
+            PretrainedModelInfo(
+                pretrained_model_name="qa_squadv1_1_megatron_cased",
+                location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/qa_squadv1_1_megatron_cased/versions/1.0.0rc1/files/qa_squadv1.1_megatron_cased.nemo",
+                description="Question answering model finetuned from Megatron Cased on SQuAD v1.1 dataset which obtains an exact match (EM) score of 88.18% and an F1 score of 94.07%.",
+            )
+        )
+
+        result.append(
+            PretrainedModelInfo(
+                pretrained_model_name="qa_squadv2_0_megatron_cased",
+                location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/qa_squadv2_0_megatron_cased/versions/1.0.0rc1/files/qa_squadv2.0_megatron_cased.nemo",
+                description="Question answering model finetuned from Megatron Cased on SQuAD v2.0 dataset which obtains an exact match (EM) score of 84.73% and an F1 score of 87.89%.",
+            )
+        )
+
+        result.append(
+            PretrainedModelInfo(
+                pretrained_model_name="qa_squadv1_1_megatron_uncased",
+                location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/qa_squadv1_1_megatron_uncased/versions/1.0.0rc1/files/qa_squadv1.1_megatron_uncased.nemo",
+                description="Question answering model finetuned from Megatron Unased on SQuAD v1.1 dataset which obtains an exact match (EM) score of 87.61% and an F1 score of 94.00%.",
+            )
+        )
+
+        result.append(
+            PretrainedModelInfo(
+                pretrained_model_name="qa_squadv2_0_megatron_uncased",
+                location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/qa_squadv2_0_megatron_uncased/versions/1.0.0rc1/files/qa_squadv2.0_megatron_uncased.nemo",
+                description="Question answering model finetuned from Megatron Uncased on SQuAD v2.0 dataset which obtains an exact match (EM) score of 84.48% and an F1 score of 87.65%.",
+            )
+        )
+        return result

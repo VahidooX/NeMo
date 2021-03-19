@@ -90,8 +90,8 @@ class SqueezeWaveModel(GlowVocoder):
         if self.mode == OperationMode.training or self.mode == OperationMode.validation:
             output_dict = {
                 "pred_normal_dist": NeuralType(('B', 'flowgroup', 'T'), NormalDistributionSamplesType()),
-                "log_s_list": NeuralType(('B', 'flowgroup', 'T'), VoidType()),  # TODO: Figure out a good typing
-                "log_det_W_list": NeuralType(elements_type=LogDeterminantType()),
+                "log_s_list": [NeuralType(('B', 'flowgroup', 'T'), VoidType())],  # TODO: Figure out a good typing
+                "log_det_W_list": [NeuralType(elements_type=LogDeterminantType())],
             }
             if self.mode == OperationMode.validation:
                 output_dict["audio_pred"] = NeuralType(('B', 'T'), AudioSignal())
@@ -132,7 +132,7 @@ class SqueezeWaveModel(GlowVocoder):
         with self.nemo_infer():
             audio = self.squeezewave(spec=spec, run_inverse=True, audio=None, sigma=sigma)
             if denoise:
-                audio = self.denoise(audio, denoiser_strength)
+                audio = self.denoise(audio=audio, strength=denoiser_strength)
 
         return audio
 
@@ -218,9 +218,9 @@ class SqueezeWaveModel(GlowVocoder):
         """
         list_of_models = []
         model = PretrainedModelInfo(
-            pretrained_model_name="SqueezeWave-22050Hz",
-            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemottsmodels/versions/1.0.0a5/files/SqueezeWave-22050Hz.nemo",
-            description="This model is trained on LJSpeech sampled at 22050Hz, and can be used as an universal vocoder.",
+            pretrained_model_name="tts_squeezewave",
+            location="https://api.ngc.nvidia.com/v2/models/nvidia/nemo/tts_squeezewave/versions/1.0.0rc1/files/tts_squeezewave.nemo",
+            description="This model is trained on LJSpeech sampled at 22050Hz, and has been tested on generating female English voices with an American accent.",
             class_=cls,
         )
         list_of_models.append(model)
