@@ -82,7 +82,7 @@ class ConvSubsampling(torch.nn.Module):
                         in_channels=in_channels,
                         out_channels=conv_channels,
                         kernel_size=self._kernel_size,
-                        stride=self._stride,
+                        stride=[self._stride, 1],
                         padding=self._padding,
                     )
                 )
@@ -97,7 +97,7 @@ class ConvSubsampling(torch.nn.Module):
                 length=int(in_length),
                 padding=self._padding,
                 kernel_size=self._kernel_size,
-                stride=self._stride,
+                stride=1, #self._stride,
                 ceil_mode=self._ceil_mode,
             )
             in_length = out_length
