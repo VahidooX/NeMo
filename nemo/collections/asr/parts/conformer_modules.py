@@ -81,6 +81,8 @@ class ConformerLayer(torch.nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.norm_out = LayerNorm(d_model)
 
+        self.concat_linear = nn.Sequential(nn.Linear(in_features=2*d_model, out_features=2*d_model), Swish(), nn.Linear(in_features=2*d_model, out_features=d_model))
+
     def forward(self, x, att_mask=None, pos_emb=None, pad_mask=None):
         """
         Args:
@@ -97,19 +99,23 @@ class ConformerLayer(torch.nn.Module):
         x = self.fc_factor * self.dropout(x) + residual
 
         residual = x
+        x = self.norm_conv(x)
+        x = self.conv(x, pad_mask)
+        x = self.dropout(x) + residual
+
+        residual = x
         x = self.norm_self_att(x)
         if self.self_attention_model == 'rel_pos':
             x = self.self_attn(query=x, key=x, value=x, mask=att_mask, pos_emb=pos_emb)
         elif self.self_attention_model == 'abs_pos':
             x = self.self_attn(query=x, key=x, value=x, mask=att_mask)
         else:
-            x = None
-        x = self.dropout(x) + residual
+            raise ValueError(f"Invalid value '{self.self_attention_model}' for self_attention_model.")
 
-        residual = x
-        x = self.norm_conv(x)
-        x = self.conv(x, pad_mask)
-        x = self.dropout(x) + residual
+        # x = self.dropout(x) + residual
+        x = self.dropout(x)
+        x = torch.cat([x, residual], dim=-1)
+        x = self.concat_linear(x)
 
         residual = x
         x = self.norm_feed_forward2(x)
