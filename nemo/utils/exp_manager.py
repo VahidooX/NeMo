@@ -681,6 +681,7 @@ def configure_checkpointing(
 
 
 def check_slurm(trainer):
+    return True
     try:
         return trainer.is_slurm_managing_tasks
     except AttributeError:
