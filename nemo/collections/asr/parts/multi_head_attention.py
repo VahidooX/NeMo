@@ -104,11 +104,11 @@ class MultiHeadAttention(nn.Module):
                 dtype = np.float16
             else:
                 dtype = np.float32
-            min_value = np.finfo(dtype).min
+            min_value = -10000 # np.finfo(dtype).min
             scores = scores.masked_fill(mask, min_value)
-            self.attn = torch.softmax(scores, dim=-1).masked_fill(mask, 0.0)  # (batch, head, time1, time2)
+            self.attn = torch.softmax(scores, dim=-1, dtype=torch.float32).masked_fill(mask, 0.0)  # (batch, head, time1, time2)
         else:
-            self.attn = torch.softmax(scores, dim=-1)  # (batch, head, time1, time2)
+            self.attn = torch.softmax(scores, dim=-1, dtype=torch.float32)  # (batch, head, time1, time2)
 
         p_attn = self.dropout(self.attn)
         x = torch.matmul(p_attn, value)  # (batch, head, time1, d_k)
