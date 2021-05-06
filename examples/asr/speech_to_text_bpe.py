@@ -68,6 +68,7 @@ def main(cfg):
     exp_manager(trainer, cfg.get("exp_manager", None))
 
     asr_model = EncDecCTCModelBPE(cfg=cfg.model, trainer=trainer)
+    asr_model.logger.watch(model=asr_model, log='all', log_freq=20)
 
     trainer.fit(asr_model)
 
