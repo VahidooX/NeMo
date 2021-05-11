@@ -19,6 +19,7 @@ import braceexpand
 import torch
 import webdataset as wd
 from torch.nn import functional as F
+from operator import itemgetter
 
 from nemo.collections.asr.data import vocabs
 from nemo.collections.asr.parts import collections, parsers
@@ -762,7 +763,7 @@ class _TarredAudioToTextDataset(IterableDataset):
 
                 audio_tar_indexes = list(range(len(audio_tar_filepaths)))[global_rank::world_size]
                 logging.info(f"Partitioning tarred dataset: process with rank {global_rank} is taking the following shards: {audio_tar_indexes}")
-                audio_tar_filepaths = audio_tar_filepaths[audio_tar_indexes]
+                audio_tar_filepaths = itemgetter(*audio_tar_indexes)(audio_tar_filepaths)
 
             elif shard_strategy == 'replicate':
                 logging.info("All tarred dataset shards will be replicated across all nodes.")
