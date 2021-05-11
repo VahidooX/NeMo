@@ -748,18 +748,21 @@ class _TarredAudioToTextDataset(IterableDataset):
             if shard_strategy == 'scatter':
                 logging.info("All tarred dataset shards will be scattered evenly across all nodes.")
 
-                if len(audio_tar_filepaths) % world_size != 0:
-                    logging.warning(
-                        f"Number of shards in tarred dataset ({len(audio_tar_filepaths)}) is not divisible "
-                        f"by number of distributed workers ({world_size})."
+                if len(audio_tar_filepaths) < world_size:
+                    raise ValueError(
+                        f"Number of shards in tarred dataset ({len(audio_tar_filepaths)}) is smaller than "
+                        f"the number of all distributed GPUs ({world_size})."
                     )
 
-                begin_idx = (len(audio_tar_filepaths) // world_size) * global_rank
-                end_idx = begin_idx + (len(audio_tar_filepaths) // world_size)
-                audio_tar_filepaths = audio_tar_filepaths[begin_idx:end_idx]
-                logging.info(
-                    "Partitioning tarred dataset: process (%d) taking shards [%d, %d)", global_rank, begin_idx, end_idx
-                )
+                if len(audio_tar_filepaths) % world_size != 0:
+                    logging.warning(
+                        f"Number of shards in tarred dataset ({len(audio_tar_filepaths)}) is not divisible by the "
+                        f"number of all distributed GPUs ({world_size}). Some GPUs get one less shard than others."
+                    )
+
+                audio_tar_indexes = list(range(len(audio_tar_filepaths)))[global_rank::world_size]
+                logging.info(f"Partitioning tarred dataset: process with rank {global_rank} is taking the following shards: {audio_tar_indexes}")
+                audio_tar_filepaths = audio_tar_filepaths[audio_tar_indexes]
 
             elif shard_strategy == 'replicate':
                 logging.info("All tarred dataset shards will be replicated across all nodes.")
