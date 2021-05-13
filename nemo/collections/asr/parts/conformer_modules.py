@@ -17,11 +17,7 @@ from torch import nn as nn
 from torch.nn import LayerNorm
 
 from nemo.collections.asr.parts.activations import Swish
-from nemo.collections.asr.parts.multi_head_attention import (
-    MultiHeadAttention,
-    RelPositionMultiHeadAttention,
-    RelPositionMultiHeadAttention2,
-)
+from nemo.collections.asr.parts.multi_head_attention import MultiHeadAttention, RelPositionMultiHeadAttention
 
 __all__ = ['ConformerConvolution', 'ConformerFeedForward', 'ConformerLayer']
 
@@ -42,13 +38,13 @@ class ConformerLayer(torch.nn.Module):
         self,
         d_model,
         d_ff,
-        conv_kernel_size,
-        self_attention_model,
-        n_heads,
-        dropout,
-        dropout_att,
-        pos_bias_u,
-        pos_bias_v,
+        self_attention_model='rel_pos',
+        n_heads=4,
+        conv_kernel_size=31,
+        dropout=0.1,
+        dropout_att=0.1,
+        pos_bias_u=None,
+        pos_bias_v=None,
     ):
         super(ConformerLayer, self).__init__()
 
@@ -70,17 +66,13 @@ class ConformerLayer(torch.nn.Module):
             self.self_attn = RelPositionMultiHeadAttention(
                 n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att, pos_bias_u=pos_bias_u, pos_bias_v=pos_bias_v
             )
-            # self.self_attn2 = RelPositionMultiHeadAttention2(
-            #     n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att, pos_bias_u=pos_bias_u, pos_bias_v=pos_bias_v
-            # )
         elif self_attention_model == 'abs_pos':
             self.self_attn = MultiHeadAttention(n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att)
-        elif self_attention_model == 'rel_pos2':
-            self.self_attn = RelPositionMultiHeadAttention2(
-                n_head=n_heads, n_feat=d_model, dropout_rate=dropout_att, pos_bias_u=pos_bias_u, pos_bias_v=pos_bias_v
-            )
         else:
-            raise ValueError(f"Not valid self_attention_model: '{self_attention_model}'!")
+            raise ValueError(
+                f"'{self_attention_model}' is not not a valid value for 'self_attention_model', "
+                f"valid values can be from ['rel_pos', 'abs_pos']"
+            )
 
         # second feed forward module
         self.norm_feed_forward2 = LayerNorm(d_model)
@@ -106,9 +98,8 @@ class ConformerLayer(torch.nn.Module):
 
         residual = x
         x = self.norm_self_att(x)
-        if self.self_attention_model == 'rel_pos' or self.self_attention_model == 'rel_pos2':
+        if self.self_attention_model == 'rel_pos':
             x = self.self_attn(query=x, key=x, value=x, mask=att_mask, pos_emb=pos_emb)
-            # x = self.self_attn2(query=x, key=x, value=x, mask=att_mask, pos_emb=pos_emb)
         elif self.self_attention_model == 'abs_pos':
             x = self.self_attn(query=x, key=x, value=x, mask=att_mask)
         else:
@@ -154,7 +145,7 @@ class ConformerConvolution(nn.Module):
             bias=True,
         )
         self.batch_norm = nn.BatchNorm1d(d_model)
-        # self.batch_norm = nn.LayerNorm(d_model)
+
         self.activation = Swish()
         self.pointwise_conv2 = nn.Conv1d(
             in_channels=d_model, out_channels=d_model, kernel_size=1, stride=1, padding=0, bias=True
@@ -163,19 +154,14 @@ class ConformerConvolution(nn.Module):
     def forward(self, x, pad_mask=None):
         x = x.transpose(1, 2)
         x = self.pointwise_conv1(x)
-
         x = nn.functional.glu(x, dim=1)
 
         if pad_mask is not None:
             x.masked_fill_(pad_mask.unsqueeze(1), 0.0)
+
         x = self.depthwise_conv(x)
-
-        # x = x.transpose(1, 2)
         x = self.batch_norm(x)
-        # x = x.transpose(1, 2)
-
         x = self.activation(x)
-
         x = self.pointwise_conv2(x)
         x = x.transpose(1, 2)
         return x
