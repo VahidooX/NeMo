@@ -1323,9 +1323,13 @@ class ModelPT(LightningModule, Model):
         return _MODEL_EFF_SAVE
 
     def load_weights_from_checkpoint(self, model_path, strict=True):
+        return
         if model_path.endswith(".nemo"):
             checkpoint = self.__class__.restore_from(model_path, map_location=torch.device('cpu'))
-            self.load_state_dict(checkpoint.state_dict(), strict=strict)
+            s = checkpoint.state_dict()
+            s.pop("decoder.decoder_layers.0.bias")
+            s.pop("decoder.decoder_layers.0.weight")
+            self.load_state_dict(s, strict=strict)
         elif model_path.endswith(".ckpt"):
             checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
             self.load_state_dict(checkpoint["state_dict"], strict=strict)
@@ -1339,4 +1343,4 @@ class ModelPT(LightningModule, Model):
         init_model_path = self._cfg.get("init_weights_from_model", "")
         if init_model_path and init_model_path != "" and self.global_step == 0:
             logging.info(f'Initializing the model with the checkpoint from "{init_model_path}"')
-            self.load_weights_from_checkpoint(init_model_path, strict=True)
+            self.load_weights_from_checkpoint(init_model_path, strict=False)

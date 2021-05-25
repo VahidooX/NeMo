@@ -82,6 +82,7 @@ def main(cfg):
         if asr_model.prepare_test(test_trainer):
             test_trainer.test(asr_model)
 
+    asr_model.save_to("/drive3/test.nemo")
 
 if __name__ == '__main__':
     main()
