@@ -40,7 +40,17 @@ NeMo is a toolkit for creating `Conversational AI <https://developer.nvidia.com/
 
 The toolkit comes with extendable collections of pre-built modules and ready-to-use models for:
 
-* `Automatic Speech Recognition (ASR) <https://ngc.nvidia.com/catalog/collections/nvidia:nemo_asr>`_
+* `Speech Processing <https://ngc.nvidia.com/catalog/collections/nvidia:nemo_asr>`_
+    * Automatic Speech Recognition (ASR): Jasper, QuartzNet, Citrinet, ContextNet, Conformer-CTC, Conformer-RNNT, ...
+    * Supports CTC and RNNT loss/decoders, Beam Search decoding
+    * Language Modelling for ASR: N-gram language modelling with KenLM in fusion with Beam Search decoding, Transformer Neural Rescorer
+    * Speech Classification and Speech Command Recognition: MatchBoxNet
+    * Voice activity Detection (VAD): MarbleNet
+    * Speaker Recognition (SR): SpeakerNet
+    * Speaker Diarization (SD)
+    * CTC Segmentation
+    * Speech Explorer: a tool to investigate and analysis speech datasets
+    * Text normalization for speech models
 * `Natual Language Processing (NLP) <https://ngc.nvidia.com/catalog/collections/nvidia:nemo_nlp>`_
 * `Text-to-Speech (TTS) <https://ngc.nvidia.com/catalog/collections/nvidia:nemo_tts>`_.
 
