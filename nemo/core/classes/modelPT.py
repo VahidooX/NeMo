@@ -1417,3 +1417,22 @@ class ModelPT(LightningModule, Model):
     def use_eff_save() -> bool:
         global _MODEL_EFF_SAVE
         return _MODEL_EFF_SAVE
+
+    def load_weights_from_checkpoint(self, model_path, strict=True):
+        if model_path.endswith(".nemo"):
+            checkpoint = self.__class__.restore_from(model_path, map_location=torch.device('cpu'))
+            self.load_state_dict(checkpoint.state_dict(), strict=strict)
+        elif model_path.endswith(".ckpt"):
+            checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
+            self.load_state_dict(checkpoint["state_dict"], strict=strict)
+        else:
+            raise ValueError(
+                "'{model_path}' is not a valid file as we need either a NeMo file ('.nemo') or "
+                "a PyTorch checkpoint ('.ckpt') to load weights from."
+            )
+
+    def on_pretrain_routine_start(self):
+        init_model_path = self._cfg.get("init_weights_from_model", "")
+        if init_model_path and init_model_path != "" and self.global_step == 0:
+            logging.info(f'Initializing the model with the checkpoint from "{init_model_path}"')
+            self.load_weights_from_checkpoint(init_model_path, strict=True)

@@ -94,18 +94,18 @@ class ConvSubsampling(torch.nn.Module):
         in_length = feat_in
         for i in range(self._sampling_num):
             out_length = calc_length(
-                length=int(in_length),
+                lengths=torch.tensor(in_length, dtype=torch.int),
                 padding=self._padding,
                 kernel_size=self._kernel_size,
                 stride=self._stride,
                 ceil_mode=self._ceil_mode,
             )
             in_length = out_length
-
+        out_length = int(out_length)
         self.out = torch.nn.Linear(conv_channels * out_length, feat_out)
         self.conv = torch.nn.Sequential(*layers)
 
-    def forward(self, x, lengths):
+    def forward_old(self, x, lengths):
         x = x.unsqueeze(1)
         x = self.conv(x)
         b, c, t, f = x.size()
@@ -128,11 +128,41 @@ class ConvSubsampling(torch.nn.Module):
         new_lengths = torch.IntTensor(new_lengths).to(lengths.device)
         return x, new_lengths
 
+    def forward(self, x, lengths):
+        x = x.unsqueeze(1)
+        x = self.conv(x)
+        b, c, t, f = x.size()
+        x = self.out(x.transpose(1, 2).contiguous().view(b, t, c * f))
 
-def calc_length(length, padding, kernel_size, stride, ceil_mode):
+        new_lengths = lengths
+        # TODO: improve the performance of length calculation
+        for i in range(self._sampling_num):
+            new_lengths = calc_length(
+                    lengths=new_lengths,
+                    padding=self._padding,
+                    kernel_size=self._kernel_size,
+                    stride=self._stride,
+                    ceil_mode=self._ceil_mode,
+                )
+
+        #new_lengths = torch.IntTensor(new_lengths).to(lengths.device)
+        new_lengths = new_lengths.to(dtype=lengths.dtype)
+        return x, new_lengths
+
+
+def calc_length_old(length, padding, kernel_size, stride, ceil_mode):
     """ Calculates the output length of a Tensor passed through a convolution or max pooling layer"""
     if ceil_mode:
         length = math.ceil((length + (2 * padding) - (kernel_size - 1) - 1) / float(stride) + 1)
     else:
         length = math.floor((length + (2 * padding) - (kernel_size - 1) - 1) / float(stride) + 1)
     return length
+
+
+def calc_length(lengths, padding, kernel_size, stride, ceil_mode):
+    """ Calculates the output length of a Tensor passed through a convolution or max pooling layer"""
+    if ceil_mode:
+        lengths = torch.ceil((lengths + (2 * padding) - (kernel_size - 1) - 1) / float(stride) + 1)
+    else:
+        lengths = torch.floor((lengths + (2 * padding) - (kernel_size - 1) - 1) / float(stride) + 1)
+    return lengths
