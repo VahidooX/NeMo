@@ -132,9 +132,7 @@ class ConvSubsampling(torch.nn.Module):
 def calc_length(lengths, padding, kernel_size, stride, ceil_mode):
     """ Calculates the output length of a Tensor passed through a convolution or max pooling layer"""
     if ceil_mode:
-        #lengths = torch.ceil((lengths + (2 * padding) - (kernel_size - 1) - 1) / float(stride) + 1)
         lengths = torch.ceil((lengths + (2 * padding) - (kernel_size - 1) - 1) / stride + 1)
     else:
-        #lengths = torch.floor((lengths + (2 * padding) - (kernel_size - 1) - 1) / float(stride) + 1)
         lengths = torch.floor(torch.div(lengths + (2 * padding) - (kernel_size - 1) - 1, stride) + 1)
     return lengths
