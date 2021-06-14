@@ -121,7 +121,7 @@ class ConvSubsampling(torch.nn.Module):
                     lengths=new_lengths,
                     padding=self._padding,
                     kernel_size=self._kernel_size,
-                    stride=torch.tensor(self._stride, dtype=torch.float),
+                    stride=self._stride,
                     ceil_mode=self._ceil_mode,
                 )
 
