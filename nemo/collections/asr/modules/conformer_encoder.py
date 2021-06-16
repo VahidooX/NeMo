@@ -221,10 +221,10 @@ class ConformerEncoder(NeuralModule, Exportable):
         bs, xmax, idim = audio_signal.size()
 
         # Create the self-attention and padding masks
-        #pad_mask = self.make_pad_mask(length, max_time=xmax, device=audio_signal.device)
-        #att_mask = pad_mask.unsqueeze(1).repeat([1, xmax, 1])
-        #att_mask = att_mask & att_mask.transpose(1, 2)
-        pad_mask, att_mask = ConformerEncoder.slice_helper_make_pad_mask(seq_lens=length, audio_signal=audio_signal)
+        pad_mask = self.make_pad_mask(length, max_time=xmax, device=audio_signal.device)
+        att_mask = pad_mask.unsqueeze(1).repeat([1, xmax, 1])
+        att_mask = att_mask & att_mask.transpose(1, 2)
+        #pad_mask, att_mask = ConformerEncoder.slice_helper_make_pad_mask(seq_lens=length, audio_signal=audio_signal)
 
         if self.att_context_size[0] >= 0:
             att_mask = att_mask.triu(diagonal=-self.att_context_size[0])
