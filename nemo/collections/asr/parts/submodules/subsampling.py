@@ -91,11 +91,11 @@ class ConvSubsampling(torch.nn.Module):
         else:
             raise ValueError(f"Not valid sub-sampling: {subsampling}!")
 
-        in_length = feat_in
+        in_length = torch.tensor(feat_in, dtype=torch.int)
         for i in range(self._sampling_num):
             # length=int(in_length),
             out_length = calc_length(
-                lengths=torch.tensor(in_length, dtype=torch.int),
+                lengths=in_length,
                 padding=self._padding,
                 kernel_size=self._kernel_size,
                 stride=self._stride,
@@ -132,7 +132,8 @@ class ConvSubsampling(torch.nn.Module):
 def calc_length(lengths, padding, kernel_size, stride, ceil_mode):
     """ Calculates the output length of a Tensor passed through a convolution or max pooling layer"""
     if ceil_mode:
-        lengths = torch.ceil((lengths + (2 * padding) - (kernel_size - 1) - 1) / stride + 1)
+        lengths = torch.ceil((lengths + (2 * padding) - (kernel_size - 1) - 1) / float(stride) + 1)
     else:
         lengths = torch.floor(torch.div(lengths + (2 * padding) - (kernel_size - 1) - 1, stride) + 1)
     return lengths
+

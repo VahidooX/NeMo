@@ -218,12 +218,12 @@ class ConformerEncoder(NeuralModule, Exportable):
             audio_signal = self.pre_encode(audio_signal)
 
         audio_signal, pos_emb = self.pos_enc(audio_signal)
-        bs, xmax, idim = audio_signal.size()
+        #bs, xmax, idim = audio_signal.size()
 
         # Create the self-attention and padding masks
-        pad_mask = self.make_pad_mask(length, max_time=xmax, device=audio_signal.device)
-        att_mask = pad_mask.unsqueeze(1).repeat([1, xmax, 1])
-        att_mask = att_mask & att_mask.transpose(1, 2)
+        #pad_mask = self.make_pad_mask(length, max_time=xmax, device=audio_signal.device)
+
+        pad_mask, att_mask = ConformerEncoder.slice_helper_make_pad_mask(seq_lens=length, audio_signal=audio_signal)
         if self.att_context_size[0] >= 0:
             att_mask = att_mask.triu(diagonal=-self.att_context_size[0])
         if self.att_context_size[1] >= 0:
@@ -253,3 +253,21 @@ class ConformerEncoder(NeuralModule, Exportable):
         if device:
             mask = mask.to(device)
         return mask
+
+    @torch.jit.script
+    def slice_helper_make_pad_mask(seq_lens, audio_signal):
+        max_time = audio_signal.size()[1]
+        bs = audio_signal.size()[0]
+        seq_range = torch.arange(0, max_time, dtype=torch.int32)
+        seq_range_expand = seq_range.unsqueeze(0).expand(bs, max_time)
+        seq_lens = seq_lens.to(device=seq_range_expand.device, dtype=torch.int32)
+        seq_length_expand = seq_lens.unsqueeze(-1)
+        #pad_mask = seq_range_expand < seq_length_expand
+        pad_mask = torch.ones_like(seq_range_expand, dtype=torch.bool)
+
+        pad_mask = pad_mask.to(audio_signal.device)
+
+        att_mask = pad_mask.unsqueeze(1).repeat([1, max_time, 1])
+        att_mask = att_mask & att_mask.transpose(1, 2)
+
+        return pad_mask, att_mask
