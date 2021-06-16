@@ -254,6 +254,7 @@ class ConformerEncoder(NeuralModule, Exportable):
             mask = mask.to(device)
         return mask
 
+    # this is the one which broke the onnx conversion.
     @torch.jit.script
     def slice_helper_make_pad_mask(seq_lens, audio_signal):
         max_time = audio_signal.size()[1]
@@ -262,8 +263,8 @@ class ConformerEncoder(NeuralModule, Exportable):
         seq_range_expand = seq_range.unsqueeze(0).expand(bs, max_time)
         seq_lens = seq_lens.to(device=seq_range_expand.device, dtype=torch.int32)
         seq_length_expand = seq_lens.unsqueeze(-1)
-        #pad_mask = seq_range_expand < seq_length_expand
-        pad_mask = torch.ones_like(seq_range_expand, dtype=torch.bool)
+        pad_mask = seq_range_expand < seq_length_expand
+        #pad_mask = torch.ones_like(seq_range_expand, dtype=torch.bool)
 
         pad_mask = pad_mask.to(audio_signal.device)
 
