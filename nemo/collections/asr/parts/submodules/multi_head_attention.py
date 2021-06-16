@@ -309,6 +309,7 @@ class RelPositionalEncoding(PositionalEncoding):
     def extend_pe(self, length):
         """Reset and extend the positional encodings if needed."""
         needed_size = 2 * (length - 1) + 1
+        # There is an onnx warning here, we may need to change this part?
         if hasattr(self, 'pe') and self.pe.size(1) >= needed_size:
             return
         # positions would be from negative numbers to positive
