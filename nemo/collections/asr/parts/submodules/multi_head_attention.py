@@ -209,8 +209,8 @@ class RelPositionMultiHeadAttention(MultiHeadAttention):
         matrix_bd = self.rel_shift(matrix_bd)
 
         # drops extra elements in the matrix_bd if there are any left from rel_shift() to match the matrix_ac's size
-        #matrix_bd = matrix_bd[:, :, :, : matrix_ac.size(-1)]
-        matrix_bd = RelPositionMultiHeadAttention.slice_helper_matrixb_bd(matrix_bd, matrix_ac)
+        matrix_bd = matrix_bd[:, :, :, : matrix_ac.size(-1)]
+        #matrix_bd = RelPositionMultiHeadAttention.slice_helper_matrixb_bd(matrix_bd, matrix_ac)
 
         scores = (matrix_ac + matrix_bd) / math.sqrt(self.d_k)  # (batch, head, time1, time2)
 
@@ -338,8 +338,13 @@ class RelPositionalEncoding(PositionalEncoding):
         # center_pos would be the index of position 0
         # negative positions would be used for right and positive for left tokens
         # for input of length L, 2*L-1 positions are needed, positions from (L-1) to -(L-1)
-        pos_emb = RelPositionalEncoding.slice_helper_pos_emb(x, self.pe)
-        #pos_emb = self.pe[:, start_pos:end_pos]
+        center_pos = self.pe.size(1) // 2
+        start_pos = center_pos - x.size(1) + 1
+        end_pos = center_pos + x.size(1)
+        pos_emb = self.pe[:, start_pos:end_pos]
+
+        #pos_emb = RelPositionalEncoding.slice_helper_pos_emb(x, self.pe)
+
         if self.dropout_emb:
             pos_emb = self.dropout_emb(pos_emb)
         return self.dropout(x), pos_emb
